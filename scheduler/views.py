@@ -42,12 +42,6 @@ def user_logout(request):
     logout(request)
     return redirect('index')
 
-# @login_required
-# def dashboard(request):
-#     jobs = Job.objects.filter(user=request.user)
-#     return render(request, 'dashboard.html', {'jobs': jobs})
-
-
 class JobViewSet(viewsets.ModelViewSet):
     queryset = Job.objects.all().order_by('-priority', 'deadline')
     serializer_class = JobSerializer
