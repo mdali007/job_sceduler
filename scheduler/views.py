@@ -70,10 +70,9 @@ def index(request):
 
 
 
-@csrf_exempt  # Temporarily disable CSRF for testing (remove later)
+@csrf_exempt 
 def submit_job(request):
     if request.method == "POST":
-        print("Raw Request Data:", request.POST.dict())  # Debugging: Print received data
 
         name = request.POST.get('name')
         duration = request.POST.get('estimated_duration')
@@ -81,7 +80,6 @@ def submit_job(request):
         deadline = request.POST.get('deadline')
 
         if not (name and duration and priority and deadline):
-            print(f"Missing data: {name}, {duration}, {priority}, {deadline}")  # Debugging
             return JsonResponse({"error": "All fields are required."}, status=400)
 
         try:
@@ -95,7 +93,6 @@ def submit_job(request):
             )
             return JsonResponse({"message": "Job submitted successfully!"}, status=201)
         except Exception as e:
-            print(f"Error creating job: {str(e)}")  # Debugging
             return JsonResponse({"error": "Error creating job."}, status=400)
     
     return JsonResponse({"error": "Invalid request"}, status=400)
