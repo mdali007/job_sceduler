@@ -1,10 +1,8 @@
 import time
 from datetime import datetime
-# from scheduler.models import Job
-
 
 def execute_jobs():
-    from scheduler.models import Job  # Move import inside function
+    from scheduler.models import Job  # Move import inside function to avoid circular import
 
     while True:
         running_jobs = Job.objects.filter(status='running').count()

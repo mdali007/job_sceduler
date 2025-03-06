@@ -1,37 +1,17 @@
 from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import User
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
-from django.contrib import messages
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from django.http import JsonResponse
+from datetime import datetime
+from django.views.decorators.csrf import csrf_exempt
 from .models import Job
 from .serializers import JobSerializer
-
-
-class JobViewSet(viewsets.ModelViewSet):
-    queryset = Job.objects.all().order_by('-priority', 'deadline')
-    serializer_class = JobSerializer
-    permission_classes = [IsAuthenticated]
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user, status="pending")
-
-
-@login_required
-def submit_job(request):
-    if request.method == "POST":
-        job = Job.objects.create(
-            user=request.user,
-            name=request.POST['name'],
-            estimated_duration=int(request.POST['duration']),
-            priority=request.POST['priority'],
-            deadline=request.POST['deadline'],
-            status="pending"
-        )
-        messages.success(request, "Job submitted successfully!")
-        return redirect('dashboard')
-
 
 def register(request):
     if request.method == "POST":
@@ -52,19 +32,76 @@ def user_login(request):
         user = authenticate(request, username=username, password=password)
         if user:
             login(request, user)
-            return redirect('dashboard')
+            return redirect('index')
         else:
             messages.error(request, "Invalid credentials.")
-    return render(request, "login.html")
+    return render(request, "index.html")
+
 
 def user_logout(request):
     logout(request)
-    return redirect('login')
+    return redirect('index')
 
-@login_required
-def dashboard(request):
+# @login_required
+# def dashboard(request):
+#     jobs = Job.objects.filter(user=request.user)
+#     return render(request, 'dashboard.html', {'jobs': jobs})
+
+
+class JobViewSet(viewsets.ModelViewSet):
+    queryset = Job.objects.all().order_by('-priority', 'deadline')
+    serializer_class = JobSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Job.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+       try:
+        serializer.save(user=self.request.user)
+       except Exception as e:
+        print("ERROR:", str(e)) 
+        raise e
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_jobs(request):
     jobs = Job.objects.filter(user=request.user)
-    return render(request, 'dashboard.html', {'jobs': jobs})
+    serializer = JobSerializer(jobs, many=True)
+    return Response(serializer.data)
 
-def home(request):
-    return render(request, "home.html")
+def index(request):
+    return render(request, 'index.html')
+
+
+
+@csrf_exempt  # Temporarily disable CSRF for testing (remove later)
+def submit_job(request):
+    if request.method == "POST":
+        print("Raw Request Data:", request.POST.dict())  # Debugging: Print received data
+
+        name = request.POST.get('name')
+        duration = request.POST.get('estimated_duration')
+        priority = request.POST.get('priority')
+        deadline = request.POST.get('deadline')
+
+        if not (name and duration and priority and deadline):
+            print(f"Missing data: {name}, {duration}, {priority}, {deadline}")  # Debugging
+            return JsonResponse({"error": "All fields are required."}, status=400)
+
+        try:
+            job = Job.objects.create(
+                user=request.user,
+                name=name,
+                estimated_duration=int(duration),
+                priority=priority,
+                deadline=datetime.fromisoformat(deadline),  # Ensure proper datetime format
+                status="pending"
+            )
+            return JsonResponse({"message": "Job submitted successfully!"}, status=201)
+        except Exception as e:
+            print(f"Error creating job: {str(e)}")  # Debugging
+            return JsonResponse({"error": "Error creating job."}, status=400)
+    
+    return JsonResponse({"error": "Invalid request"}, status=400)
